@@ -60,11 +60,11 @@ class ProjectionLayer(nn.Module):
     def __init__(self, dim, vocab_size) -> None:
         super().__init__()
         self.linear = nn.Linear(dim, vocab_size)
-        self.softmax =  nn.LogSoftmax(dim=-1)#nn.Softmax(dim=-1)
+        # self.softmax =  nn.LogSoftmax(dim=-1)#nn.Softmax(dim=-1)
     
     def forward(self, x):
-        output = self.softmax(self.linear(x))
-        return torch.nan_to_num(output)
+        output = self.linear(x)
+        return output
 
 class FullModel(nn.Module):
 
@@ -79,7 +79,7 @@ class FullModel(nn.Module):
     def forward(self, token_ids, key_padding_mask):
         x = self.embeddings(token_ids)
         for enc in self.encoders:
-            x = enc(x, key_padding_mask)  
+            x = enc(x, key_padding_mask=key_padding_mask)
         output = self.projection(x)
         return output
 

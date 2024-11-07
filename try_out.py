@@ -1,12 +1,13 @@
 # read in data
 from toy_vocab import VOCAB
-from modules import FullModel
+from modules import FullModel, Embedding
 import torch 
 import torch.nn as nn
 
+torch.autograd.anomaly_mode.set_detect_anomaly(True)
 train = "toy_data/train.txt"
 max_len = 16
-dim = 8
+dim = 32
 
 # Read in data
 train_data = []
@@ -39,37 +40,39 @@ train_ids = torch.IntTensor(train_ids).type(torch.int64) # (n_sequences, sequenc
 
 att_pad_mask = train_ids == vocab_dict["[PAD]"]
 att_pad_mask = att_pad_mask.T
+print(att_pad_mask)
 model = FullModel(
     model_dim=8, 
     vocab_size=vocab_size,
-    num_heads=1,
-    n_layers=1, 
+    num_heads=4,
+    n_layers=2, 
     dropout=0.01
 )
 
-loss_function = nn.CrossEntropyLoss()
-optim = torch.optim.SGD(params=model.parameters(), lr=0.001)
+loss_function = nn.CrossEntropyLoss(ignore_index=0)
+optim = torch.optim.SGD(params=model.parameters(), lr=0.01)
 
 y_true = nn.functional.one_hot(train_ids).type(torch.float64)
+y_true = torch.flatten(y_true, end_dim=1)
+y_true = y_true.argmax(dim=1)
 print(y_true)
-y_true_classes = y_true.argmax(dim=2)
 
-for epoch in range(200):
+for epoch in range(50):
 
     print(f"EPOCH {epoch}")
     model.train()
-    pred = model(train_ids, key_padding_mask=None)
+    pred = model(train_ids, key_padding_mask=att_pad_mask)
+    print(pred)
+    pred = torch.flatten(pred, end_dim=1)
+    print(pred.argmax(dim=1))
     loss = loss_function(pred, y_true)
     print(loss)
     optim.zero_grad()
     loss.backward()
     optim.step()
 
-pred = model(train_ids, key_padding_mask=None)
-pred = torch.argmax(pred, dim=2)
-print(pred)
-y_true = torch.argmax(y_true, dim=2)
-correct = torch.sum(y_true == pred)
-all_pred = torch.sum(torch.ones(y_true.shape))
-print("Accuracy", correct/all_pred)
-print(vocab_dict)
+mask = y_true != 0
+y_true = y_true[mask]
+pred = pred.argmax(dim=1)[mask]
+correct = sum(pred == y_true)
+print(correct/y_true.shape[0])
