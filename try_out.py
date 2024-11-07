@@ -7,7 +7,7 @@ import torch.nn as nn
 torch.autograd.anomaly_mode.set_detect_anomaly(True)
 train = "toy_data/train.txt"
 max_len = 16
-dim = 32
+dim = 64
 
 # Read in data
 train_data = []
@@ -38,11 +38,10 @@ for x in train_data:
 train_ids = torch.IntTensor(train_ids).type(torch.int64) # (n_sequences, sequence_length)
 # ============================================================== 
 
-att_pad_mask = train_ids == vocab_dict["[PAD]"]
-att_pad_mask = att_pad_mask.T
-print(att_pad_mask)
+att_pad_mask = train_ids != vocab_dict["[PAD]"]
+
 model = FullModel(
-    model_dim=8, 
+    model_dim=dim, 
     vocab_size=vocab_size,
     num_heads=4,
     n_layers=2, 
@@ -52,21 +51,16 @@ model = FullModel(
 loss_function = nn.CrossEntropyLoss(ignore_index=0)
 optim = torch.optim.SGD(params=model.parameters(), lr=0.01)
 
-y_true = nn.functional.one_hot(train_ids).type(torch.float64)
-y_true = torch.flatten(y_true, end_dim=1)
-y_true = y_true.argmax(dim=1)
-print(y_true)
+y_true = torch.flatten(train_ids, end_dim=1)
 
-for epoch in range(50):
+for epoch in range(100):
 
     print(f"EPOCH {epoch}")
     model.train()
     pred = model(train_ids, key_padding_mask=att_pad_mask)
-    print(pred)
     pred = torch.flatten(pred, end_dim=1)
-    print(pred.argmax(dim=1))
     loss = loss_function(pred, y_true)
-    print(loss)
+    print(f"Loss: {loss}")
     optim.zero_grad()
     loss.backward()
     optim.step()

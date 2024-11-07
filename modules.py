@@ -24,6 +24,7 @@ class MultiHeadAttention(nn.Module):
             embed_dim = embed_dim,
             num_heads = num_heads,
             dropout = dropout,
+            batch_first=True,
             **kwargs
         )
     
@@ -76,7 +77,7 @@ class FullModel(nn.Module):
             for _ in range(n_layers)])
         self.projection = ProjectionLayer(dim=model_dim, vocab_size=vocab_size)
     
-    def forward(self, token_ids, key_padding_mask):
+    def forward(self, token_ids, key_padding_mask=None):
         x = self.embeddings(token_ids)
         for enc in self.encoders:
             x = enc(x, key_padding_mask=key_padding_mask)
