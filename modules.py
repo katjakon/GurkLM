@@ -114,11 +114,15 @@ class FullModel(nn.Module):
             for _ in range(n_layers)])
         self.projection = ProjectionLayer(dim=model_dim, vocab_size=vocab_size)
     
-    def forward(self, token_ids, key_padding_mask=None):
+    def forward(self, token_ids, key_padding_mask, pred_mask):
         x = self.embeddings(token_ids)
         x = x + self.pe(x)
         for enc in self.encoders:
             x = enc(x, key_padding_mask=key_padding_mask)
+        # Gather inputs which are masked
+        x = torch.flatten(x, end_dim=1)
+        x = x[pred_mask]
+        # Predict vocab for masked tokens
         output = self.projection(x)
         return output
 
