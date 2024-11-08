@@ -1,6 +1,6 @@
 # read in data
 from toy_vocab import VOCAB
-from modules import FullModel, Embedding
+from modules import FullModel, PositionalEncoding
 import torch 
 import torch.nn as nn
 
@@ -45,7 +45,8 @@ model = FullModel(
     vocab_size=vocab_size,
     num_heads=4,
     n_layers=2, 
-    dropout=0.01
+    dropout=0.01,
+    max_len=max_len
 )
 
 loss_function = nn.CrossEntropyLoss(ignore_index=0)
@@ -53,7 +54,7 @@ optim = torch.optim.SGD(params=model.parameters(), lr=0.01)
 
 y_true = torch.flatten(train_ids, end_dim=1)
 
-for epoch in range(100):
+for epoch in range(10):
 
     print(f"EPOCH {epoch}")
     model.train()
@@ -65,8 +66,12 @@ for epoch in range(100):
     loss.backward()
     optim.step()
 
-mask = y_true != 0
-y_true = y_true[mask]
-pred = pred.argmax(dim=1)[mask]
-correct = sum(pred == y_true)
-print(correct/y_true.shape[0])
+model.eval()
+with torch.no_grad():
+    pred = model(train_ids, key_padding_mask=att_pad_mask)
+    pred = torch.flatten(pred, end_dim=1)
+    mask = y_true != 0
+    y_true = y_true[mask]
+    pred = pred.argmax(dim=1)[mask]
+    correct = sum(pred == y_true)
+    print(correct/y_true.shape[0])

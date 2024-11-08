@@ -1,21 +1,44 @@
+import math
+
 import torch.nn as nn
 import torch
 
 class Embedding(nn.Module):
 
-    def __init__(self, vocab_size, dim):
+    def __init__(self, vocab_size, dim, dropout):
         super().__init__()
         self.embed = nn.Embedding(
             num_embeddings=vocab_size,
             embedding_dim=dim,
             padding_idx=0
             )
+        self.dropout = nn.Dropout(dropout)
     
     def forward(self, x):
         # x is (n_seq, seq_length)
-        return self.embed(x)
+        return self.dropout(self.embed(x))
 
+class PositionalEncoding(nn.Module):
 
+    def __init__(self, d_model: int, max_len: int, dropout: float = 0.1):
+        super().__init__()
+        self.dropout = nn.Dropout(p=dropout)
+
+        position = torch.arange(max_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))
+        pe = torch.zeros(1, max_len, d_model)
+        pe[0, :, 0::2] = torch.sin(position * div_term)
+        pe[0, :, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        """
+        Arguments:
+            x: Tensor, shape ``[batch_size, seq_len, embedding_dim]``
+        """
+        x = x + self.pe[:x.size(1)]
+        return self.dropout(x)
+    
 class MultiHeadAttention(nn.Module):
 
     def __init__(self, embed_dim, num_heads, dropout, **kwargs) -> None:
@@ -31,37 +54,50 @@ class MultiHeadAttention(nn.Module):
     def forward(self, query, key, value, key_padding_mask=None):
         return self.mha(query, key, value, key_padding_mask=key_padding_mask)
 
+class ResidualConnection(nn.Module):
+
+    def __init__(self, dim):
+        super().__init__()
+        self.norm = nn.LayerNorm(normalized_shape=dim)
+    
+    def forward(self, output, residual):
+        x = output + residual
+        return self.norm(x)
+
 class EncoderBlock(nn.Module):
 
     def __init__(self, embed_dim, num_heads, dropout, dim) -> None:
         super().__init__()
         self.mha = MultiHeadAttention(embed_dim=embed_dim, num_heads=num_heads, dropout=dropout)
-        self.norms = nn.ModuleList(
-            [nn.LayerNorm(normalized_shape=dim), 
-             nn.LayerNorm(normalized_shape=dim)]
-        ) 
         self.ff = nn.Sequential(
             nn.Linear(in_features=dim, out_features=dim),
             nn.ReLU(),
             nn.Linear(in_features=dim, out_features=dim),
             nn.ReLU()
         )
+        self.residuals = nn.ModuleList(
+            [ResidualConnection(dim=embed_dim),
+             ResidualConnection(dim=embed_dim)]
+        ) 
+        self.dropouts = nn.ModuleList(
+            [nn.Dropout(dropout),
+             nn.Dropout(dropout)]
+        )
     
     def forward(self, x, key_padding_mask):
-        attn_output, attn_output_weights = self.mha(x, x, x, key_padding_mask=key_padding_mask)
-        add = x + attn_output
-        norm1 = self.norms[0](add)
-        ff_output = self.ff(norm1)
-        add = ff_output + norm1
-        norm2 = self.norms[1](add)
-        return norm2
+        attn_output, _ = self.mha(x, x, x, key_padding_mask=key_padding_mask)
+        dropout1 = self.dropouts[0](attn_output)
+        residual1 = self.residuals[0](dropout1, x)
+        ff_output = self.ff(residual1)
+        dropout2 = self.dropouts[1](ff_output)
+        residual2 = self.residuals[1](dropout2, residual1)
+        return residual2
 
 class ProjectionLayer(nn.Module):
 
     def __init__(self, dim, vocab_size) -> None:
         super().__init__()
         self.linear = nn.Linear(dim, vocab_size)
-        # self.softmax =  nn.LogSoftmax(dim=-1)#nn.Softmax(dim=-1)
     
     def forward(self, x):
         output = self.linear(x)
@@ -69,9 +105,10 @@ class ProjectionLayer(nn.Module):
 
 class FullModel(nn.Module):
 
-    def __init__(self, model_dim, vocab_size, num_heads, n_layers, dropout ):
+    def __init__(self, model_dim, vocab_size, num_heads, n_layers, dropout, max_len):
         super().__init__()
-        self.embeddings = Embedding(vocab_size=vocab_size, dim=model_dim)
+        self.embeddings = Embedding(vocab_size=vocab_size, dim=model_dim, dropout=dropout)
+        self.pe = PositionalEncoding(d_model=model_dim, max_len=max_len, dropout=dropout)
         self.encoders = nn.ModuleList([
             EncoderBlock(embed_dim=model_dim, num_heads=num_heads, dropout=dropout, dim=model_dim ) 
             for _ in range(n_layers)])
@@ -79,6 +116,7 @@ class FullModel(nn.Module):
     
     def forward(self, token_ids, key_padding_mask=None):
         x = self.embeddings(token_ids)
+        x = x + self.pe(x)
         for enc in self.encoders:
             x = enc(x, key_padding_mask=key_padding_mask)
         output = self.projection(x)
