@@ -34,21 +34,6 @@ class PositionalEncoding(nn.Module):
     def forward(self, x):
         x = x + self.pe[:x.size(1)]
         return self.dropout(x)
-    
-class MultiHeadAttention(nn.Module):
-
-    def __init__(self, embed_dim, num_heads, dropout, **kwargs) -> None:
-        super().__init__()
-        self.mha = nn.MultiheadAttention(
-            embed_dim = embed_dim,
-            num_heads = num_heads,
-            dropout = dropout,
-            batch_first=True,
-            **kwargs
-        )
-    
-    def forward(self, query, key, value, key_padding_mask=None):
-        return self.mha(query, key, value, key_padding_mask=key_padding_mask)
 
 class ResidualConnection(nn.Module):
 
@@ -64,7 +49,12 @@ class EncoderBlock(nn.Module):
 
     def __init__(self, embed_dim, num_heads, dropout, dim) -> None:
         super().__init__()
-        self.mha = MultiHeadAttention(embed_dim=embed_dim, num_heads=num_heads, dropout=dropout)
+        self.mha = nn.MultiheadAttention(
+            embed_dim=embed_dim,
+            num_heads=num_heads,
+            dropout=dropout,
+            batch_first=True,
+            )
         self.ff = nn.Sequential(
             nn.Linear(in_features=dim, out_features=dim),
             nn.ReLU(),
@@ -120,6 +110,8 @@ class FullModel(nn.Module):
         x = x[pred_mask]
         # Predict vocab for masked tokens
         output = self.projection(x)
-        return output
+        return {
+            "masked_preds": output,
+            "representations": x}
 
 

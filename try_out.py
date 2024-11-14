@@ -42,7 +42,7 @@ model = FullModel(
     max_len=max_len
 )
 # Define Loss criterion and optimizer
-loss_function = nn.CrossEntropyLoss(ignore_index=0)
+loss_function = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
 optim = torch.optim.SGD(params=model.parameters(), lr=0.01)
 
 for epoch in range(n_epochs):
@@ -55,11 +55,12 @@ for epoch in range(n_epochs):
         batch_y_true = batch["original_sequence"] # True tokens without mask
         batch_y_true = torch.flatten(batch_y_true[batch_lm_mask])
 
-        batch_pred = model(
+        batch_out = model(
             batch_input_ids,
             key_padding_mask=batch_padding_mask,
             pred_mask=torch.flatten(batch_lm_mask))
-
+        batch_pred = batch_out["masked_preds"]
+        batch_repr = batch_out["representations"]
         loss = loss_function(batch_pred, batch_y_true)
         if batch_y_true.shape[0] != 0: # We might have masked no tokens by chance, avoid zero division
             batch_acc = sum(batch_pred.argmax(dim=1) == batch_y_true) / (batch_y_true.shape[0])
@@ -68,7 +69,7 @@ for epoch in range(n_epochs):
         optim.zero_grad()
         loss.backward()
         optim.step()
-
+# Saving model
 # Evaluation
 test_data = GurkDataset(
     data_dir="toy_data/test",
@@ -99,6 +100,7 @@ for test in dataloader:
     mask_eye = torch.flatten(mask_eye)
     with torch.no_grad():
         pred = model(input_ids, key_padding_mask=pad_mask, pred_mask=mask_eye)
+        pred = pred["masked_preds"]
         pred = pred.argmax(dim=1)
     # Prediction example
     print(f"True Sequence: {tokenizer.decode(y_true)}")
