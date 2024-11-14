@@ -32,10 +32,6 @@ class PositionalEncoding(nn.Module):
         self.register_buffer('pe', pe)
 
     def forward(self, x):
-        """
-        Arguments:
-            x: Tensor, shape ``[batch_size, seq_len, embedding_dim]``
-        """
         x = x + self.pe[:x.size(1)]
         return self.dropout(x)
     
