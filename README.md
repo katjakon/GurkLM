@@ -24,3 +24,12 @@ Pretraining a language model for **G**erman-T**urk**ish Code-Switching (Gurk)
 - [ ] Construct validation tasks
 - [ ] Establish upper bound (existing pretrained model)
 - [ ] Establish lower bound (random baseline, majority baseline)
+
+# more is more (data)
+
+- https://github.com/ozlemcek/TuGeBiC
+  + \# of tokens 	116688
+  + \# of monolingual sentences 	10141
+  + \# of bilingual sentences 	4510
+  + \# of CS points in bilingual sentences 	8180
+  
