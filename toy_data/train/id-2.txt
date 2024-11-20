@@ -1,1 +1,4 @@
+zwiebel zwiebel apfel
 apfel gurke apfel gurke
+apfel apfel zwiebel
+gurke gurke zwiebel apfel

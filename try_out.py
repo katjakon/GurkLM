@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from transformers import BertTokenizer
+from trainer import Trainer
 
 torch.autograd.anomaly_mode.set_detect_anomaly(True)
 
@@ -17,71 +18,41 @@ n_epochs = 50 # Will probably not lead to good results with the large vocab lol.
 tokenizer = BertTokenizer.from_pretrained("google-bert/bert-base-multilingual-cased", local_files_only=True)
 vocab_size = tokenizer.vocab_size
 
-# Gurk data set init, custom dataset
-dataset = GurkDataset(
-    data_dir="toy_data/train",
+
+trainer = Trainer(
     tokenizer=tokenizer,
-    train=True,
-    max_len=max_len,
-    mask_p=0.15
+    train_dir="toy_data/train",
+    test_dir="toy_data/test",
+    model_params={
+        "model_dim": 128,
+        "num_heads": 4,
+        "n_layers": 6, 
+        "dropout": 0.01
+    },
+    optim_params={
+        "lr": 0.1
+    }, 
+    optimizer=torch.optim.SGD,
+    n_epochs=50,
+    batch_size=2,
+    mask_p=0.15,
+    max_len=32
 )
 
-dataloader = DataLoader(
-    dataset=dataset,
-    batch_size=5,
-    shuffle=True
+trainer.train(
+    out_dir="checkpoints",
+    start_from_chp=False,
+    save_steps=5,
+    chp_path="checkpoints\checkpoint-5-1.pt"
 )
 
-# Model initialization
-model = FullModel(
-    model_dim=dim, 
-    vocab_size=vocab_size,
-    num_heads=2,
-    n_layers=6, 
-    dropout=0.05,
-    max_len=max_len
-)
-# Define Loss criterion and optimizer
-loss_function = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
-optim = torch.optim.SGD(params=model.parameters(), lr=0.01)
-
-for epoch in range(n_epochs):
-    model.train()
-    print(f"EPOCH {epoch}")
-    for batch in dataloader:
-        batch_input_ids = batch["masked_sequence"] # Here randomly some tokens have been replace by [MASK].
-        batch_padding_mask = batch["padding_mask"] # Masks which specifies which tokens are [PAD]
-        batch_lm_mask = batch["lm_mask"] # Masks which specifies where tokens have been replace by [MASK]
-        batch_y_true = batch["original_sequence"] # True tokens without mask
-        batch_y_true = torch.flatten(batch_y_true[batch_lm_mask])
-
-        batch_out = model(
-            batch_input_ids,
-            key_padding_mask=batch_padding_mask,
-            pred_mask=torch.flatten(batch_lm_mask))
-        batch_pred = batch_out["masked_preds"]
-        batch_repr = batch_out["representations"]
-        loss = loss_function(batch_pred, batch_y_true)
-        if batch_y_true.shape[0] != 0: # We might have masked no tokens by chance, avoid zero division
-            batch_acc = sum(batch_pred.argmax(dim=1) == batch_y_true) / (batch_y_true.shape[0])
-            print(f"Batch Accuracy: {batch_acc}")
-        print(f"Batch Loss: {loss}")
-        optim.zero_grad()
-        loss.backward()
-        optim.step()
 # Saving model
 # Evaluation
-test_data = GurkDataset(
-    data_dir="toy_data/test",
-    tokenizer=tokenizer,
-    train=False,
-    max_len=max_len
-)
-dataloader = DataLoader(test_data)
-model.eval()
+test_data = trainer._get_test_dataloader()
+trainer.model.eval()
 
 # Pretty ugly evaluation for one test case, needed to make this more efficient, prettier later...
-for test in dataloader:
+for test in test_data:
     input_ids = test["original_sequence"]
     pad_mask = test["padding_mask"]
     # Mask each token exactly once
@@ -99,7 +70,7 @@ for test in dataloader:
 
     mask_eye = torch.flatten(mask_eye)
     with torch.no_grad():
-        pred = model(input_ids, key_padding_mask=pad_mask, pred_mask=mask_eye)
+        pred = trainer.model(input_ids, key_padding_mask=pad_mask, pred_mask=mask_eye)
         pred = pred["masked_preds"]
         pred = pred.argmax(dim=1)
     # Prediction example
