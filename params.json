@@ -1,0 +1,24 @@
+{
+    "train_path": "toy_data/train",
+    "val_path": "toy_data/test",
+    "checkpoint_path": "toy_ckp",
+    "start_from_ckp": false,
+    "load_ckp": null,
+    "save_steps": 100,
+    "tokenizer-model": "google-bert/bert-base-multilingual-uncased",
+    "optimizer": "sgd",
+    "n_epochs": 5, 
+    "batch_size": 32,
+    "masking_p": 0.15,
+    "max_len": 64,
+    "model_params": {
+        "model_dim": 128,
+        "num_heads": 4, 
+        "n_layers": 6,
+        "dropout": 0.1
+    },
+    "optim_params": {
+        "lr": 0.01
+    }
+
+}
