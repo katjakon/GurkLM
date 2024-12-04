@@ -214,13 +214,21 @@ class Trainer:
             # Do validatio after every epoch.
             print(f"Finished epoch {epoch}: Validate...")
             val_loss, val_acc = self.validate(val_loader)
+            self._save_checkpoint(
+                        epoch=epoch,
+                        loss=loss, 
+                        step=step, 
+                        out=out_dir,
+                        seed=dataloader.dataset.seed
+                    )
             print(f"Validation loss: {val_loss:.2f}\t Validation accuracy@3 {val_acc:.2f}")
     
     def _save_checkpoint(self, epoch, loss, step, out, seed):
-        print(f"Saving checkpoint to {out} ...", end="")
+        file_name = f"checkpoint-epoch{epoch}-step{step}.pt"
+        print(f"Saving checkpoint to {out}/{file_name} ...", end="")
         out_path = os.path.join(
             out, 
-            f"checkpoint-epoch{epoch}-step{step}.pt"
+            file_name
         )
         torch.save({
             'epoch': epoch,
