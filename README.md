@@ -5,8 +5,8 @@ Pretraining a language model for **G**erman-T**urk**ish Code-Switching (Gurk)
 
 ## Implementation transformer & training
 - [x] Choose and use pre-trained tokenizer
-- [ ] Masking: Not only use [MASK], but random token ids & same token id
-- [ ] Implement saving checkpoints
+- [x] Masking: Not only use [MASK], but random token ids & same token id
+- [x] Implement saving checkpoints
 - [x] Implement positional encodings
 
 ## Pretraining data
