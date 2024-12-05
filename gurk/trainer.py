@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 import random
+import time
 
 from .dataset import GurkDataset
 from .modules import FullModel
@@ -80,6 +81,7 @@ class Trainer:
             is_split_into_words=True,
             add_special_tokens=False,
             padding="max_length",
+            truncation=True,
             max_length=self.max_len,
             return_tensors="pt"
             )
@@ -172,6 +174,7 @@ class Trainer:
 
             for batch in dataloader:
                 step += 1
+                start_t = time.time()
                 
                 if step <= start_step: # Start from right batch
                     if step == start_step:
@@ -194,10 +197,13 @@ class Trainer:
                 # Calculate loss
                 loss = self.loss_fn(batch_pred, batch_y_true)
                 acc_at3 = self.accuracy_at_n(batch_pred, batch_y_true, n=3)
-                print(f"Batch loss: {loss:.2f}\t Batch accuracy@3: {acc_at3:.2f}")
+                print(f"Batch loss: {loss:.2f}\t Batch accuracy@3: {acc_at3:.2f}", end="\t")
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
+                end_t = time.time()
+                batch_time = end_t - start_t
+                print(f"ms/batch: {batch_time*1000.0:.2f}")
 
                 if step % save_steps == 0:
                     print(f"Step {step}: Validate...")
