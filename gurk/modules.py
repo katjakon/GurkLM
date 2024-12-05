@@ -84,10 +84,11 @@ class ProjectionLayer(nn.Module):
     def __init__(self, dim, vocab_size) -> None:
         super().__init__()
         self.linear = nn.Linear(dim, vocab_size)
+        self.norm = nn.LayerNorm(normalized_shape=vocab_size)
     
     def forward(self, x):
         output = self.linear(x)
-        return output
+        return self.norm(output)
 
 class FullModel(nn.Module):
 
