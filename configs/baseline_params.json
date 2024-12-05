@@ -1,0 +1,24 @@
+{
+    "train_path": "data/train",
+    "val_path": "data/val",
+    "checkpoint_path": "first_try",
+    "start_from_ckp": false,
+    "load_ckp": null,
+    "save_steps": 200,
+    "tokenizer-model": "google-bert/bert-base-multilingual-cased",
+    "optimizer": "sgd",
+    "n_epochs": 5, 
+    "batch_size": 128,
+    "masking_p": 0.15,
+    "max_len": 512,
+    "model_params": {
+        "model_dim": 512,
+        "num_heads": 4, 
+        "n_layers": 6,
+        "dropout": 0.2
+    },
+    "optim_params": {
+        "lr": 0.01
+    }
+
+}
