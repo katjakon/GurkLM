@@ -63,7 +63,7 @@ class Trainer:
 
     def _create_masks(self, input_ids):
         padding_mask = input_ids == self.tokenizer.pad_token_id
-        rand = torch.rand(input_ids.shape) # random probabilities for each token
+        rand = torch.rand(input_ids.shape, device=DEVICE) # random probabilities for each token
         p_random = (1 - self.p_only_masked) # percentage of masked tokens that should be replaced with random tokens
         p_unchanged = p_random / 2 # Percentage of masked tokens that are left unchanged
         lm_mask = (rand <= self.mask_p) & (~ padding_mask) # Mask tokens with certain prob but not padding tokens.
@@ -105,10 +105,10 @@ class Trainer:
         for batch in dataloader:
             n_batch += 1
             with torch.no_grad():
-                batch_input_ids = batch["masked_sequence"] # Here randomly some tokens have been replace by [MASK].
-                batch_padding_mask = batch["padding_mask"] # Masks which specifies which tokens are [PAD]
-                batch_lm_mask = batch["lm_mask"] # Masks which specifies where tokens have been replace by [MASK]
-                batch_y_true = batch["original_sequence"] # True tokens without mask
+                batch_input_ids = batch["masked_sequence"].to(DEVICE) # Here randomly some tokens have been replace by [MASK].
+                batch_padding_mask = batch["padding_mask"].to(DEVICE) # Masks which specifies which tokens are [PAD]
+                batch_lm_mask = batch["lm_mask"].to(DEVICE) # Masks which specifies where tokens have been replace by [MASK]
+                batch_y_true = batch["original_sequence"].to(DEVICE) # True tokens without mask
                 batch_y_true = torch.flatten(batch_y_true[batch_lm_mask])
 
                 # Make predictions
