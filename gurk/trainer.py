@@ -68,6 +68,11 @@ class Trainer:
         p_random = (1 - self.p_only_masked) # percentage of masked tokens that should be replaced with random tokens
         p_unchanged = p_random / 2 # Percentage of masked tokens that are left unchanged
         lm_mask = (rand <= self.mask_p) & (~ padding_mask) # Mask tokens with certain prob but not padding tokens.
+        if not lm_mask.any(): # There is no tokens masked!
+            row_i, col_i = (~ padding_mask).nonzero(as_tuple=True) # Get indices of tokens which are not PAD
+            rand_index = torch.randint(high=row_i.shape[0], size=(1,)) # Choose random one.
+            lm_mask[row_i[rand_index], col_i[rand_index]] = True # Make sure at least one token is masked.
+            assert lm_mask.any()
         rand[~lm_mask] = torch.inf # Don't consider indices where lm_mask is False
         rand = rand / self.mask_p # Rescale according to masking percentage
         mask_random = (rand <= p_random) & (rand > p_unchanged)
@@ -80,7 +85,7 @@ class Trainer:
             batch,
             is_split_into_words=True,
             add_special_tokens=False,
-            padding="max_length",
+            padding=True,
             truncation=True,
             max_length=self.max_len,
             return_tensors="pt"

@@ -7,10 +7,10 @@
     "save_steps": 100,
     "tokenizer-model": "google-bert/bert-base-multilingual-uncased",
     "optimizer": "sgd",
-    "n_epochs": 5, 
+    "n_epochs": 50, 
     "batch_size": 32,
     "masking_p": 0.15,
-    "max_len": 64,
+    "max_len": 16,
     "model_params": {
         "model_dim": 128,
         "num_heads": 4, 
