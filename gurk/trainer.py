@@ -14,8 +14,10 @@ class Trainer:
 
     def __init__(self,
                  tokenizer,
-                 train_dir,
-                 test_dir,
+                 # train_dir,
+                 # test_dir,
+                 train_dl,
+                 test_dl,
                  model_params,
                  optimizer,
                  optim_params, 
@@ -25,8 +27,10 @@ class Trainer:
                  max_len,
                  p_only_masked=0.8,
                  ):
-        self.train_dir = train_dir
-        self.test_dir = test_dir
+        # self.train_dir = train_dir
+        # self.test_dir = test_dir
+        self.train_dl = train_dl
+        self.test_dl = test_dl
         self.tokenizer = tokenizer
         self.model_params = model_params
         self.optim_params = optim_params
@@ -39,30 +43,37 @@ class Trainer:
         self.model = None
         self.start_epoch = 0
         self.loss_fn = nn.CrossEntropyLoss(ignore_index=self.tokenizer.pad_token_id)
-    
-    def _get_train_dataloader(self):
-        gurk_dataset = GurkDataset(
-            data_dir=self.train_dir,
-            shuffle=True
-        )
-        return DataLoader(
-            gurk_dataset,
-            collate_fn=self._process_batch,
-            batch_size=self.batch_size
-        )
-    
-    def _get_test_dataloader(self):
-        gurk_dataset = GurkDataset(
-            data_dir=self.test_dir,
-            shuffle=False
-        )
-        return DataLoader(
-            gurk_dataset,
-            collate_fn=self._process_batch,
-            batch_size=self.batch_size
-        )
 
-    def _create_masks(self, input_ids):
+    def _get_train_dataloader(self):
+        return torch.load(self.train_dl)
+
+    def _get_test_dataloader(self):
+        return torch.load(self.test_dl)
+
+    # def _get_train_dataloader(self):
+    #     gurk_dataset = GurkDataset(
+    #         data_dir=self.train_dir,
+    #         shuffle=True
+    #     )
+    #     return DataLoader(
+    #         gurk_dataset,
+    #         collate_fn=self._process_batch,
+    #         batch_size=self.batch_size
+    #     )
+
+    # def _get_test_dataloader(self):
+    #     gurk_dataset = GurkDataset(
+    #         data_dir=self.test_dir,
+    #         shuffle=False
+    #     )
+    #     return DataLoader(
+    #         gurk_dataset,
+    #         collate_fn=self._process_batch,
+    #         batch_size=self.batch_size
+    #     )
+
+    def _create_masks(self, batch):
+        input_ids = batch["input_ids"]
         padding_mask = input_ids == self.tokenizer.pad_token_id
         rand = torch.rand(input_ids.shape, device=DEVICE) # random probabilities for each token
         p_random = (1 - self.p_only_masked) # percentage of masked tokens that should be replaced with random tokens
@@ -81,28 +92,57 @@ class Trainer:
         return lm_mask, padding_mask, mask_random, mask_unchanged
 
     def _process_batch(self, batch):
-        tok_output = self.tokenizer(
-            batch,
-            is_split_into_words=True,
-            add_special_tokens=False,
-            padding=True,
-            truncation=True,
-            max_length=self.max_len,
-            return_tensors="pt"
-            )
-        input_ids = tok_output["input_ids"].to(DEVICE)
-        mask_out = self._create_masks(input_ids)
+        # tok_output = self.tokenizer(
+        #     batch,
+        #     is_split_into_words=True,
+        #     add_special_tokens=False,
+        #     padding=True,
+        #     truncation=True,
+        #     max_length=self.max_len,
+        #     return_tensors="pt"
+        #     )
+        # batch.to(DEVICE)
+        batch["input_ids"].to(DEVICE)
+        # batch["attention_mask"].to(DEVICE)
+        mask_out = self._create_masks(batch)
         lm_mask, padding_mask, mask_random, mask_unchanged = mask_out
-        masked = input_ids.detach().clone()
+        # masked = input_ids.detach().clone()
+        masked = batch["input_ids"].detach().clone()
         masked[lm_mask] = self.tokenizer.mask_token_id
         masked[mask_random] = random.randrange(1, self.tokenizer.vocab_size) # Sample random tokens
-        masked[mask_unchanged] = input_ids[mask_unchanged]
+        # masked[mask_unchanged] = input_ids[mask_unchanged]
+        masked[mask_unchanged] = batch["input_ids"][mask_unchanged]
         return {
-            "original_sequence": input_ids,
+            # "original_sequence": input_ids,
+            "original_sequence": batch["input_ids"],
             "masked_sequence": masked,
             "padding_mask": padding_mask,
             "lm_mask": lm_mask
         }
+
+    # def _process_batch(self, batch):
+    #     tok_output = self.tokenizer(
+    #         batch,
+    #         is_split_into_words=True,
+    #         add_special_tokens=False,
+    #         padding=True,
+    #         truncation=True,
+    #         max_length=self.max_len,
+    #         return_tensors="pt"
+    #         )
+    #     input_ids = tok_output["input_ids"].to(DEVICE)
+    #     mask_out = self._create_masks(input_ids)
+    #     lm_mask, padding_mask, mask_random, mask_unchanged = mask_out
+    #     masked = input_ids.detach().clone()
+    #     masked[lm_mask] = self.tokenizer.mask_token_id
+    #     masked[mask_random] = random.randrange(1, self.tokenizer.vocab_size) # Sample random tokens
+    #     masked[mask_unchanged] = input_ids[mask_unchanged]
+    #     return {
+    #         "original_sequence": input_ids,
+    #         "masked_sequence": masked,
+    #         "padding_mask": padding_mask,
+    #         "lm_mask": lm_mask
+    #     }
 
     def validate(self, dataloader, n=3):
         self.model.eval() # Set to eval mode.
@@ -112,6 +152,7 @@ class Trainer:
         for batch in dataloader:
             n_batch += 1
             with torch.no_grad():
+                batch = self._process_batch(batch)
                 batch_input_ids = batch["masked_sequence"].to(DEVICE) # Here randomly some tokens have been replace by [MASK].
                 batch_padding_mask = batch["padding_mask"].to(DEVICE) # Masks which specifies which tokens are [PAD]
                 batch_lm_mask = batch["lm_mask"].to(DEVICE) # Masks which specifies where tokens have been replace by [MASK]
@@ -172,7 +213,7 @@ class Trainer:
             self.model.train()
             step = 0
 
-            dataloader.dataset.permute(seed=seed)
+            # dataloader.dataset.permute(seed=seed)
 
             if seed is not None: # When training from checkpoint, we use a specific seed
                 seed = None # Permutation will be random afterwards again
@@ -186,6 +227,7 @@ class Trainer:
                         start_step = 0
                     continue
                 
+                batch = self._process_batch(batch)
                 batch_input_ids = batch["masked_sequence"] # Here randomly some tokens have been replace by [MASK].
                 batch_padding_mask = batch["padding_mask"] # Masks which specifies which tokens are [PAD]
                 batch_lm_mask = batch["lm_mask"] # Masks which specifies where tokens have been replace by [MASK]

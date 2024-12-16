@@ -39,8 +39,10 @@ if __name__ == "__main__":
     # Set up trainer:
     trainer = Trainer(
     tokenizer=tokenizer,
-    train_dir=params_dict["train_path"],
-    test_dir=params_dict["val_path"],
+    # train_dir=params_dict["train_path"],
+    # test_dir=params_dict["val_path"],
+    train_dl=params_dict["train_path"],
+    test_dl=params_dict["val_path"],
     model_params=params_dict["model_params"],
     optim_params=params_dict["optim_params"], 
     optimizer=optimizer,
