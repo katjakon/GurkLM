@@ -166,7 +166,7 @@ class Trainer:
                 pred_mask=torch.flatten(batch_lm_mask))
                 batch_pred = batch_out["masked_preds"]
 
-                val_loss = self.loss_fn(batch_pred, batch_y_true)
+                val_loss = self.loss_fn(batch_pred, batch_y_true).item()
                 sum_loss += val_loss
 
                 acc = self.accuracy_at_n(y_pred=batch_pred, y_true=batch_y_true, n=n)
@@ -228,26 +228,34 @@ class Trainer:
                     continue
                 
                 batch = self._process_batch(batch)
-                batch_input_ids = batch["masked_sequence"] # Here randomly some tokens have been replace by [MASK].
-                batch_padding_mask = batch["padding_mask"] # Masks which specifies which tokens are [PAD]
+                # batch_input_ids = batch["masked_sequence"] # Here randomly some tokens have been replace by [MASK].
+                # batch_padding_mask = batch["padding_mask"] # Masks which specifies which tokens are [PAD]
                 batch_lm_mask = batch["lm_mask"] # Masks which specifies where tokens have been replace by [MASK]
                 batch_y_true = batch["original_sequence"] # True tokens without mask
                 batch_y_true = torch.flatten(batch_y_true[batch_lm_mask])
 
                 # Make predictions
-                batch_out = self.model(
-                batch_input_ids,
-                key_padding_mask=batch_padding_mask,
-                pred_mask=torch.flatten(batch_lm_mask))
-                batch_pred = batch_out["masked_preds"]
+                # batch_out = self.model(
+                    # batch_input_ids,
+                    # key_padding_mask=batch_padding_mask,
+                    # pred_mask=torch.flatten(batch_lm_mask)
+                # )
+                batch = self.model(
+                    batch["masked_sequence"],
+                    key_padding_mask=batch["padding_mask"],
+                    pred_mask=torch.flatten(batch["lm_mask"])
+                )
+                # batch_pred = batch_out["masked_preds"]
 
                 # Calculate loss
-                loss = self.loss_fn(batch_pred, batch_y_true)
-                acc_at3 = self.accuracy_at_n(batch_pred, batch_y_true, n=3)
-                print(f"Batch loss: {loss:.2f}\t Batch accuracy@3: {acc_at3:.2f}", end="\t")
+                # loss = self.loss_fn(batch_pred, batch_y_true)
+                loss = self.loss_fn(batch["masked_preds"], batch_y_true)
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
+                # acc_at3 = self.accuracy_at_n(batch_pred, batch_y_true, n=3)
+                acc_at3 = self.accuracy_at_n(batch["masked_preds"], batch_y_true, n=3)
+                print(f"Batch loss: {loss:.2f}\t Batch accuracy@3: {acc_at3:.2f}", end="\t")
                 end_t = time.time()
                 batch_time = end_t - start_t
                 print(f"ms/batch: {batch_time*1000.0:.2f}")
