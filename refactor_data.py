@@ -13,14 +13,19 @@ from torch.utils.data import DataLoader
 from torchtune.data._common import CROSS_ENTROPY_IGNORE_IDX, PACK_TYPE
 from tqdm import tqdm
 
+# silence tqdm
+# from functools import partialmethod
+# tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
+
 
 tokenizer = AutoTokenizer.from_pretrained('bert-base-cased')
 
 
 class PackedCucumbers:
 
-    def __init__(self, data_path, tokenizer, seed=13, start_id=0, batch_num=0, shuffle=True):
+    def __init__(self, data_path, tokenizer, seed=13, max_seq_len=512, start_id=0, batch_num=0, shuffle=True):
         self.seed = seed
+        self.max_seq_len = max_seq_len
         self.shuffle = shuffle
         self.start_batch = batch_num
         self.root = data_path
@@ -43,7 +48,7 @@ class PackedCucumbers:
                 random.shuffle(lines)
             ds = Dataset.from_list(lines)
             ds = ds.map(self._tokenize)
-        return PackedDataset(ds, max_seq_len=512)
+        return PackedDataset(ds, max_seq_len=self.max_seq_len, split_across_pack=True)
 
     def _tokenize(self, instance):
         input_ids = self.tokenizer(instance["text"],
