@@ -207,6 +207,7 @@ class Trainer:
             print(f"Loaded seed with {seed}")
             self.start_epoch = last_epoch
         
+        loss = None
         for epoch in range(self.start_epoch, self.n_epochs):
 
             print(f"Epoch {epoch}")
@@ -215,8 +216,8 @@ class Trainer:
 
             # dataloader.dataset.permute(seed=seed)
 
-            if seed is not None: # When training from checkpoint, we use a specific seed
-                seed = None # Permutation will be random afterwards again
+            # if seed is not None: # When training from checkpoint, we use a specific seed
+                # seed = None # Permutation will be random afterwards again
 
             for batch in dataloader:
                 step += 1
@@ -269,9 +270,12 @@ class Trainer:
                         epoch=epoch,
                         loss=loss, 
                         step=step, 
-                        out=out_dir,
-                        seed=dataloader.dataset.seed
+                        out=out_dir#,
+                        # seed=dataloader.dataset.seed
                     ) 
+            # Don't trigger validation before reaching right moment
+            if loss is None:
+                continue
             # Do validatio after every epoch.
             print(f"Finished epoch {epoch}: Validate...")
             val_loss, val_acc = self.validate(val_loader)
@@ -279,12 +283,12 @@ class Trainer:
                         epoch=epoch,
                         loss=loss, 
                         step=step, 
-                        out=out_dir,
-                        seed=dataloader.dataset.seed
+                        out=out_dir#,
+                        # seed=dataloader.dataset.seed
                     )
             print(f"Validation loss: {val_loss:.2f}\t Validation accuracy@3 {val_acc:.2f}")
     
-    def _save_checkpoint(self, epoch, loss, step, out, seed):
+    def _save_checkpoint(self, epoch, loss, step, out, seed=None):
         file_name = f"checkpoint-epoch{epoch}-step{step}.pt"
         print(f"Saving checkpoint to {out}/{file_name} ...", end="")
         out_path = os.path.join(
@@ -318,10 +322,8 @@ class Trainer:
         self.model.load_state_dict(checkpoint['model_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         epoch = checkpoint['epoch']
-        seed = checkpoint["seed"]
+        # seed = checkpoint["seed"]
+        seed = None
         step = checkpoint["step"]
         return epoch, seed, step
-
-
-
 
