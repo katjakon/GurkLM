@@ -102,7 +102,7 @@ class Trainer:
         #     return_tensors="pt"
         #     )
         # batch.to(DEVICE)
-        batch["input_ids"].to(DEVICE)
+        batch["input_ids"] = batch["input_ids"].to(DEVICE)
         # batch["attention_mask"].to(DEVICE)
         mask_out = self._create_masks(batch)
         lm_mask, padding_mask, mask_random, mask_unchanged = mask_out
@@ -301,6 +301,7 @@ class Trainer:
             max_len=self.max_len, 
             **self.model_params
         )
+        self.model.to(DEVICE)
         self.optimizer = self.optimizer(
             params=self.model.parameters(),
             **self.optim_params)
