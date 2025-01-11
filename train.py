@@ -23,6 +23,7 @@ if __name__ == "__main__":
     tokenizer = BertTokenizer.from_pretrained(params_dict["tokenizer-model"])
     print("done!")
 
+    # Set up optimizer
     optimizer = None
     optim_class = params_dict["optimizer"].lower()
 
@@ -36,6 +37,14 @@ if __name__ == "__main__":
     if optimizer is None:
         raise ValueError(f"Optimizer class {optim_class} is not supported!")
     
+    # Set up Scheduler
+    scheduler = params_dict.get("scheduler", None)
+
+    if scheduler == "LinearLR":
+        scheduler = torch.optim.lr_scheduler.LinearLR
+    elif scheduler is not None:
+        raise ValueError(f"Scheduler {scheduler} is not supported!")
+
     # Set up trainer:
     trainer = Trainer(
     tokenizer=tokenizer,
@@ -49,7 +58,9 @@ if __name__ == "__main__":
     n_epochs=params_dict["n_epochs"],
     batch_size=params_dict["batch_size"],
     mask_p=params_dict["masking_p"],
-    max_len=params_dict["max_len"]
+    max_len=params_dict["max_len"],
+    scheduler=scheduler,
+    scheduler_params=params_dict.get("scheduler_params", {})
 )
     
     # Start training.
