@@ -211,6 +211,7 @@ class Trainer:
         
         loss = None
         for epoch in range(self.start_epoch, self.n_epochs):
+            # torch.cuda.empty_cache()
 
             print(f"Epoch {epoch}")
             self.model.train()
@@ -225,7 +226,7 @@ class Trainer:
                 step += 1
                 start_t = time.time()
                 
-                if step <= start_step: # Start from right batch
+                if step <= start_step:  # Start from right batch
                     if step == start_step:
                         start_step = 0
                     continue
@@ -233,9 +234,9 @@ class Trainer:
                 batch = self._process_batch(batch)
                 # batch_input_ids = batch["masked_sequence"] # Here randomly some tokens have been replace by [MASK].
                 # batch_padding_mask = batch["padding_mask"] # Masks which specifies which tokens are [PAD]
-                batch_lm_mask = batch["lm_mask"] # Masks which specifies where tokens have been replace by [MASK]
-                batch_y_true = batch["original_sequence"] # True tokens without mask
-                batch_y_true = torch.flatten(batch_y_true[batch_lm_mask])
+                # batch_lm_mask = batch["lm_mask"] # Masks which specifies where tokens have been replace by [MASK]
+                # batch_y_true = batch["original_sequence"] # True tokens without mask
+                batch_y_true = torch.flatten(batch["original_sequence"][batch["lm_mask"]])
 
                 # Make predictions
                 # batch_out = self.model(
@@ -253,12 +254,14 @@ class Trainer:
                 # Calculate loss
                 # loss = self.loss_fn(batch_pred, batch_y_true)
                 loss = self.loss_fn(batch["masked_preds"], batch_y_true)
-                self.optimizer.zero_grad()
                 loss.backward()
+                # I changed the order here (...step before zero grad
                 self.optimizer.step()
+                # ...and added "set to none"
+                self.optimizer.zero_grad(set_to_none=True)
                 # acc_at3 = self.accuracy_at_n(batch_pred, batch_y_true, n=3)
                 acc_at3 = self.accuracy_at_n(batch["masked_preds"], batch_y_true, n=3)
-                print(f"Batch loss: {loss:.2f}\t Batch accuracy@3: {acc_at3:.2f}", end="\t")
+                print(f"Batch loss on step {step}: {loss:.2f}\t Batch accuracy@3: {acc_at3:.2f}", end="\t")
                 end_t = time.time()
                 batch_time = end_t - start_t
                 print(f"ms/batch: {batch_time*1000.0:.2f}")
@@ -289,6 +292,8 @@ class Trainer:
                         # seed=dataloader.dataset.seed
                     )
             print(f"Validation loss: {val_loss:.2f}\t Validation accuracy@3 {val_acc:.2f}")
+            # Empty cache
+            torch.cuda.empty_cache()
     
     def _save_checkpoint(self, epoch, loss, step, out, seed=None):
         file_name = f"checkpoint-epoch{epoch}-step{step}.pt"
@@ -307,6 +312,10 @@ class Trainer:
             }, out_path)
         print("Done")
     
+    def save_shards(self, path, out_dir):
+        self._load_checkpoint(path)
+        self.model.save_pretrained(out_dir)
+        print(f"saved model to {out_dir}")
 
     def _load_checkpoint(self, path):
         print(f"Loading checkpoint from {path}")
