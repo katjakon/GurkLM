@@ -44,33 +44,35 @@ class Trainer:
         self.start_epoch = 0
         self.loss_fn = nn.CrossEntropyLoss(ignore_index=self.tokenizer.pad_token_id)
 
+    # def _get_train_dataloader(self):
+        # return torch.load(self.train_dl)
+    # 
+    # def _get_test_dataloader(self):
+        # return torch.load(self.test_dl)
+
     def _get_train_dataloader(self):
-        return torch.load(self.train_dl)
+        # gurk_dataset = GurkDataset(
+            # data_dir=self.train_dir,
+            # shuffle=True
+        # )
+        gurk_dataset = torch.load(self.train_dl)
+        return DataLoader(
+            gurk_dataset,
+            collate_fn=self._process_batch,
+            batch_size=self.batch_size
+        )
 
     def _get_test_dataloader(self):
-        return torch.load(self.test_dl)
-
-    # def _get_train_dataloader(self):
-    #     gurk_dataset = GurkDataset(
-    #         data_dir=self.train_dir,
-    #         shuffle=True
-    #     )
-    #     return DataLoader(
-    #         gurk_dataset,
-    #         collate_fn=self._process_batch,
-    #         batch_size=self.batch_size
-    #     )
-
-    # def _get_test_dataloader(self):
-    #     gurk_dataset = GurkDataset(
-    #         data_dir=self.test_dir,
-    #         shuffle=False
-    #     )
-    #     return DataLoader(
-    #         gurk_dataset,
-    #         collate_fn=self._process_batch,
-    #         batch_size=self.batch_size
-    #     )
+        gurk_dataset = torch.load(self.test_dl)
+        # gurk_dataset = GurkDataset(
+            # data_dir=self.test_dir,
+            # shuffle=False
+        # )
+        return DataLoader(
+            gurk_dataset,
+            collate_fn=self._process_batch,
+            batch_size=self.batch_size
+        )
 
     def _create_masks(self, batch):
         input_ids = batch["input_ids"]
