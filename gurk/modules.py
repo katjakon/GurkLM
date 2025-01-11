@@ -57,9 +57,9 @@ class EncoderBlock(nn.Module):
             )
         self.ff = nn.Sequential(
             nn.Linear(in_features=dim, out_features=dim),
-            nn.ReLU(),
+            nn.GELU(),
             nn.Linear(in_features=dim, out_features=dim),
-            nn.ReLU()
+            nn.GELU()
         )
         self.residuals = nn.ModuleList(
             [ResidualConnection(dim=embed_dim),
