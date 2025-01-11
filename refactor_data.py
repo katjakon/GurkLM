@@ -14,8 +14,8 @@ from torchtune.data._common import CROSS_ENTROPY_IGNORE_IDX, PACK_TYPE
 from tqdm import tqdm
 
 # silence tqdm
-# from functools import partialmethod
-# tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
+from functools import partialmethod
+tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
 
 tokenizer = AutoTokenizer.from_pretrained('bert-base-cased')
@@ -35,10 +35,22 @@ class PackedCucumbers:
         if self.shuffle:
             random.seed(seed)
             random.shuffle(self.shuffeled_ids)
-            print(self.shuffeled_ids)
+            print("Shuffeled ids")
         if start_id:
             self.shuffeled_ids = self.shuffeled_ids[self.shuffeled_ids.index(start_id):]
         self.batch_num = batch_num
+
+    def _load_all(self, file_paths):
+        lines = []
+        for file_path in file_paths:
+            with open(file_path, encoding="utf-8") as file_in:
+                lines += [{"text": line} for line in file_in]
+        if self.shuffle:
+            random.seed(self.seed)
+            random.shuffle(lines)
+        ds = Dataset.from_list(lines)
+        ds = ds.map(self._tokenize)
+        return PackedDataset(ds, max_seq_len=self.max_seq_len, split_across_pack=True)
 
     def _load(self, file_path):
         with open(file_path, encoding="utf-8") as file_in:
@@ -56,6 +68,9 @@ class PackedCucumbers:
                                    add_special_tokens=False)["input_ids"]
         return {"input_ids": input_ids}
 
+    def create_giant_dataset(self):
+        file_paths = [os.path.join(self.root, self.files[i]) for i in self.shuffeled_ids]
+        return self._load_all(file_paths).packs
 
     def create_giant_dataloader(self, batch_size=32):
         file_paths = [os.path.join(self.root, self.files[i]) for i in self.shuffeled_ids]
@@ -267,7 +282,7 @@ class PackedDataset(Dataset):
 
         return {
             "input_ids": padded_input_ids,
-            "input_pos": padded_input_pos,
+            # "input_pos": padded_input_pos,
             # "seq_lens": padded_seq_lens,
         }
 
@@ -285,12 +300,16 @@ class PackedDataset(Dataset):
         return self.packs[idx]
 
 
-gurks = PackedCucumbers("GurkLM-dev/data/val/", tokenizer)
-dl = gurks.create_giant_dataloader()
-torch.save(dl, 'tiny_dataloader_val.pth')
+# gurks = PackedCucumbers("data/complete_minus_val/", tokenizer, max_seq_len=256)
+gurks = PackedCucumbers("data/val_complete/", tokenizer, max_seq_len=256)
+# gurks = PackedCucumbers("data/train_subset/", tokenizer, max_seq_len=256)
+# dl = gurks.create_giant_dataloader()
+# torch.save(dl, 'data/dataloader_train_compl2_seqlen256.pth')
+ds = gurks.create_giant_dataset()
+torch.save(ds, 'data/dataset_val_tokenized_seqlen256.pth')
 
-for i in dl:
+for i in ds:
     print(i)
-    print(i["input_pos"].shape)
+    # print(i["input_pos"].shape)
     break
 
