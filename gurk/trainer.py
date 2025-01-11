@@ -24,7 +24,8 @@ class Trainer:
                  mask_p, 
                  max_len,
                  p_only_masked=0.8,
-                 ):
+                scheduler = None,
+                scheduler_params = None):
         self.train_dataset = train_dataset
         self.test_dataset = test_dataset
         self.tokenizer = tokenizer
@@ -36,6 +37,8 @@ class Trainer:
         self.mask_p = mask_p
         self.p_only_masked = p_only_masked
         self.max_len = max_len
+        self.scheduler = scheduler
+        self.scheduler_params = scheduler_params if scheduler_params is not None else {}
         self.model = None
         self.start_epoch = 0
         self.loss_fn = nn.CrossEntropyLoss(ignore_index=self.tokenizer.pad_token_id)
@@ -147,6 +150,11 @@ class Trainer:
                 params=self.model.parameters(),
                 **self.optim_params
             )
+            if self.scheduler is not None:
+                self.scheduler = self.scheduler(
+                    self.optimizer,
+                    **self.scheduler_params
+                )
 
         else:
             if chp_path is None:
@@ -205,9 +213,15 @@ class Trainer:
                         step=step, 
                         out=out_dir
                     ) 
+            
             # Don't trigger validation before reaching right moment
             if loss is None:
                 continue
+
+            if self.scheduler is not None:
+                print(f"Current Learning Rate: {self.scheduler.get_lr()[0]:.2e}")
+                self.scheduler.step()
+
             # Do validatio after every epoch.
             print(f"Finished epoch {epoch}: Validate...")
             val_loss, val_acc = self.validate(val_loader)
@@ -229,10 +243,15 @@ class Trainer:
             out, 
             file_name
         )
+        if self.scheduler is not None:
+            scheduler_state_dict = self.scheduler.state_dict()
+        else:
+            scheduler_state_dict = None
         torch.save({
             'epoch': epoch,
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
+            'scheduler_state_dict': scheduler_state_dict,
             'loss': loss,
             'step': step,
             "seed": seed
@@ -255,10 +274,18 @@ class Trainer:
         self.optimizer = self.optimizer(
             params=self.model.parameters(),
             **self.optim_params)
+        
+        if self.scheduler is not None:
+            self.scheduler = self.scheduler(
+                optimizer=self.optimizer,
+                **self.scheduler_params
+            )
 
         checkpoint = torch.load(path, weights_only=True, map_location=DEVICE)
         self.model.load_state_dict(checkpoint['model_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        if self.scheduler is not None:
+            self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
         epoch = checkpoint['epoch']
         seed = None
         step = checkpoint["step"]
