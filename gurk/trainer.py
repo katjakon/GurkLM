@@ -14,10 +14,8 @@ class Trainer:
 
     def __init__(self,
                  tokenizer,
-                 # train_dir,
-                 # test_dir,
-                 train_dl,
-                 test_dl,
+                 train_dataset,
+                 test_dataset,
                  model_params,
                  optimizer,
                  optim_params, 
@@ -27,10 +25,8 @@ class Trainer:
                  max_len,
                  p_only_masked=0.8,
                  ):
-        # self.train_dir = train_dir
-        # self.test_dir = test_dir
-        self.train_dl = train_dl
-        self.test_dl = test_dl
+        self.train_dataset = train_dataset
+        self.test_dataset = test_dataset
         self.tokenizer = tokenizer
         self.model_params = model_params
         self.optim_params = optim_params
@@ -44,18 +40,8 @@ class Trainer:
         self.start_epoch = 0
         self.loss_fn = nn.CrossEntropyLoss(ignore_index=self.tokenizer.pad_token_id)
 
-    # def _get_train_dataloader(self):
-        # return torch.load(self.train_dl)
-    # 
-    # def _get_test_dataloader(self):
-        # return torch.load(self.test_dl)
-
     def _get_train_dataloader(self):
-        # gurk_dataset = GurkDataset(
-            # data_dir=self.train_dir,
-            # shuffle=True
-        # )
-        gurk_dataset = torch.load(self.train_dl)
+        gurk_dataset = torch.load(self.train_dataset)
         return DataLoader(
             gurk_dataset,
             collate_fn=self._process_batch,
@@ -63,11 +49,7 @@ class Trainer:
         )
 
     def _get_test_dataloader(self):
-        gurk_dataset = torch.load(self.test_dl)
-        # gurk_dataset = GurkDataset(
-            # data_dir=self.test_dir,
-            # shuffle=False
-        # )
+        gurk_dataset = torch.load(self.test_dataset)
         return DataLoader(
             gurk_dataset,
             collate_fn=self._process_batch,
@@ -94,57 +76,21 @@ class Trainer:
         return lm_mask, padding_mask, mask_random, mask_unchanged
 
     def _process_batch(self, batch):
-        # tok_output = self.tokenizer(
-        #     batch,
-        #     is_split_into_words=True,
-        #     add_special_tokens=False,
-        #     padding=True,
-        #     truncation=True,
-        #     max_length=self.max_len,
-        #     return_tensors="pt"
-        #     )
-        # batch.to(DEVICE)
-        batch["input_ids"] = batch["input_ids"].to(DEVICE)
-        # batch["attention_mask"].to(DEVICE)
+        input_ids = batch["input_ids"].to(DEVICE)
         mask_out = self._create_masks(batch)
         lm_mask, padding_mask, mask_random, mask_unchanged = mask_out
-        # masked = input_ids.detach().clone()
-        masked = batch["input_ids"].detach().clone()
+        masked = input_ids.detach().clone()
         masked[lm_mask] = self.tokenizer.mask_token_id
         masked[mask_random] = random.randrange(1, self.tokenizer.vocab_size) # Sample random tokens
         # masked[mask_unchanged] = input_ids[mask_unchanged]
-        masked[mask_unchanged] = batch["input_ids"][mask_unchanged]
+        masked[mask_unchanged] = input_ids[mask_unchanged]
         return {
             # "original_sequence": input_ids,
-            "original_sequence": batch["input_ids"],
+            "original_sequence": input_ids,
             "masked_sequence": masked,
             "padding_mask": padding_mask,
             "lm_mask": lm_mask
         }
-
-    # def _process_batch(self, batch):
-    #     tok_output = self.tokenizer(
-    #         batch,
-    #         is_split_into_words=True,
-    #         add_special_tokens=False,
-    #         padding=True,
-    #         truncation=True,
-    #         max_length=self.max_len,
-    #         return_tensors="pt"
-    #         )
-    #     input_ids = tok_output["input_ids"].to(DEVICE)
-    #     mask_out = self._create_masks(input_ids)
-    #     lm_mask, padding_mask, mask_random, mask_unchanged = mask_out
-    #     masked = input_ids.detach().clone()
-    #     masked[lm_mask] = self.tokenizer.mask_token_id
-    #     masked[mask_random] = random.randrange(1, self.tokenizer.vocab_size) # Sample random tokens
-    #     masked[mask_unchanged] = input_ids[mask_unchanged]
-    #     return {
-    #         "original_sequence": input_ids,
-    #         "masked_sequence": masked,
-    #         "padding_mask": padding_mask,
-    #         "lm_mask": lm_mask
-    #     }
 
     def validate(self, dataloader, n=3):
         self.model.eval() # Set to eval mode.
@@ -211,16 +157,10 @@ class Trainer:
         
         loss = None
         for epoch in range(self.start_epoch, self.n_epochs):
-            # torch.cuda.empty_cache()
 
             print(f"Epoch {epoch}")
             self.model.train()
             step = 0
-
-            # dataloader.dataset.permute(seed=seed)
-
-            # if seed is not None: # When training from checkpoint, we use a specific seed
-                # seed = None # Permutation will be random afterwards again
 
             for batch in dataloader:
                 step += 1
@@ -232,34 +172,22 @@ class Trainer:
                     continue
                 
                 batch = self._process_batch(batch)
-                # batch_input_ids = batch["masked_sequence"] # Here randomly some tokens have been replace by [MASK].
-                # batch_padding_mask = batch["padding_mask"] # Masks which specifies which tokens are [PAD]
-                # batch_lm_mask = batch["lm_mask"] # Masks which specifies where tokens have been replace by [MASK]
-                # batch_y_true = batch["original_sequence"] # True tokens without mask
                 batch_y_true = torch.flatten(batch["original_sequence"][batch["lm_mask"]])
 
                 # Make predictions
-                # batch_out = self.model(
-                    # batch_input_ids,
-                    # key_padding_mask=batch_padding_mask,
-                    # pred_mask=torch.flatten(batch_lm_mask)
-                # )
                 batch = self.model(
                     batch["masked_sequence"],
                     key_padding_mask=batch["padding_mask"],
                     pred_mask=torch.flatten(batch["lm_mask"])
                 )
-                # batch_pred = batch_out["masked_preds"]
 
                 # Calculate loss
-                # loss = self.loss_fn(batch_pred, batch_y_true)
                 loss = self.loss_fn(batch["masked_preds"], batch_y_true)
                 loss.backward()
                 # I changed the order here (...step before zero grad
                 self.optimizer.step()
                 # ...and added "set to none"
                 self.optimizer.zero_grad(set_to_none=True)
-                # acc_at3 = self.accuracy_at_n(batch_pred, batch_y_true, n=3)
                 acc_at3 = self.accuracy_at_n(batch["masked_preds"], batch_y_true, n=3)
                 print(f"Batch loss on step {step}: {loss:.2f}\t Batch accuracy@3: {acc_at3:.2f}", end="\t")
                 end_t = time.time()
@@ -275,8 +203,7 @@ class Trainer:
                         epoch=epoch,
                         loss=loss, 
                         step=step, 
-                        out=out_dir#,
-                        # seed=dataloader.dataset.seed
+                        out=out_dir
                     ) 
             # Don't trigger validation before reaching right moment
             if loss is None:
@@ -333,7 +260,6 @@ class Trainer:
         self.model.load_state_dict(checkpoint['model_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         epoch = checkpoint['epoch']
-        # seed = checkpoint["seed"]
         seed = None
         step = checkpoint["step"]
         return epoch, seed, step
