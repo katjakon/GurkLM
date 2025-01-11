@@ -1,7 +1,7 @@
 {
     "train_path": "data/train",
     "val_path": "data/val",
-    "checkpoint_path": "toy_ckp",
+    "checkpoint_path": "run-02",
     "start_from_ckp": false,
     "load_ckp": null,
     "save_steps": 30000,
