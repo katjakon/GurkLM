@@ -42,10 +42,28 @@ class MLPClassifier(torch.nn.Module):
         # Feed through mlp.
         return self.mlp(emb)
 
+class UpperBoundClassifier(MLPClassifier):
+    """Set up neural network for POS tagging.
+
+    This network consists of two layers: one RoBERTa embedding layer and on top
+    of that a linear layer for classification. The linear layer projects to the
+    final set of classes.
+
+    Args:
+        num_classes (int): the number of classes
+    """
+    def forward(self, x, padding_mask):
+        # Retrieve embedding representation first
+        self.model.eval()
+        with torch.no_grad():
+          emb = self.model(x, attention_mask=padding_mask).last_hidden_state
+        # Feed through single linear layer
+        return self.mlp(emb)
+
 def accuracy(gold, pred, ignore_index=-100):
     """Calculate the accuracy for a given set of predictions."""
     # List containing 1 for each correct prediction, 0 for each incorrect one
-    filtered_preds = [int(g == p) for g, p in zip(gold, pred) if g != -100]
+    filtered_preds = [int(g == p) for g, p in zip(gold, pred) if g != ignore_index]
     # (correct, total)
     return sum(filtered_preds), len(filtered_preds)
 
@@ -81,6 +99,7 @@ def train_model(model, dataloader_trn, dataloader_val, lr, n_epochs, pad_token_i
   for epoch in range(n_epochs):
     # Set model into training mode
     model.train()
+    model.to(device)
     # Initialize counter
     train_total = 0
     train_correct = 0
