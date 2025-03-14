@@ -99,6 +99,7 @@ def train_model(model, dataloader_trn, dataloader_val, lr, n_epochs, pad_token_i
   for epoch in range(n_epochs):
     # Set model into training mode
     model.train()
+    model.to(device)
     # Initialize counter
     train_total = 0
     train_correct = 0
