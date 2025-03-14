@@ -4,20 +4,25 @@ import os
 from statistics import mean
 
 import torch
-from transformers import BertTokenizerFast
+from transformers import BertTokenizerFast, BertModel, AutoModelForMaskedLM
 from sklearn.metrics import f1_score, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 from gurk.modules import FullModel
 from gurk.ud_data import get_ud_data, get_code_mapping, get_pos_mapping, POS, CODE
-from gurk.classifier import MLPClassifier, train_model
+from gurk.classifier import MLPClassifier, UpperBoundClassifier, train_model
+from gurk.masked_predict import accuracy_at_n, predict_masked_bert, predict_masked_gurk
 
 MLM = "mlm"
+GURK = "gurk"
 
 VALID_TASK = {POS, CODE, MLM}
+MODEL_TYPE = {GURK, "google-bert/bert-base-multilingual-cased"}
 
-def get_predictions(model, dl):
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+def get_predictions(model, dl, pad_token_id):
   """Predict all instances in given dataloader for a model in eval model."""
   model.eval()
   all_preds = []
@@ -25,7 +30,7 @@ def get_predictions(model, dl):
   with torch.no_grad():
     for batch in tqdm(dl, desc="Predicting.."):
       inputs = batch["input_ids"].to(device)
-      pad_mask  = inputs == tokenizer.pad_token_id
+      pad_mask  = inputs == pad_token_id
       # Get prediction
       pred = model(inputs, pad_mask)
       pred = pred.flatten(end_dim=1)
@@ -50,16 +55,10 @@ def compute_metrics(y_true, y_pred, labels):
       "f1_weighted": f1_weighted,
   }
 
-def accuracy_at_n(y_true, y_pred, n=3):
-  top_n = torch.topk(y_pred, k=n)[1]
-  y_true = y_true.view(-1, 1).to(device)
-  correct = (y_true == top_n).any(1)
-  return torch.sum(correct) / correct.size(0)
-
-def save_metrics(label_mapping, dl, model, task, output):
+def save_metrics(label_mapping, dl, model, task, output, pad_token_id):
     labels = list(label_mapping.keys())
     str_label = [label_mapping[k] for k in labels]
-    golds, preds = get_predictions(model, dl)
+    golds, preds = get_predictions(model, dl, pad_token_id)
     gold_filtered, pred_filtered = [], []
 
     for g, p in zip(golds, preds):
@@ -93,11 +92,11 @@ if __name__ == "__main__":
     parser.add_argument(
        "--config",
        help="Path to model config file.",
-       required=True)
+       required=False)
     parser.add_argument(
        "--checkpoint", 
        help="Path to model checkpoint.", 
-       required=True
+       required=False
        )
     parser.add_argument(
        "--output-path", 
@@ -142,6 +141,12 @@ if __name__ == "__main__":
        required=False, 
        default=None
     )
+    parser.add_argument(
+       "--model-type",
+       help="Either use 'gurk' for custom model or choose a pre-trained BERT model from huggingface.",
+       required=False, 
+       default=GURK
+    )
 
     args = parser.parse_args()
     config_path = args.config #"configs/run-02-params.json"
@@ -153,33 +158,51 @@ if __name__ == "__main__":
     lr = args.lr
     n_epochs = args.epochs
     output_path = args.output_path # "results"
+    model_type = args.model_type
 
     if task not in VALID_TASK:
         raise ValueError("Invalid validation task. Choose from {}".format(", ".join(VALID_TASK)))
     
+    if model_type not in MODEL_TYPE:
+       raise ValueError("Invalid model type. Choose from: {}".format(", ".join(MODEL_TYPE)))
+    
+    no_cp_no_cfg = (config_path is None or checkpoint_path is None) # No config or checkpoint is given!
+    if model_type == GURK and no_cp_no_cfg:
+       raise ValueError("Need checkpoint and config file for custom GURK model!")
+    
     if not os.path.exists(output_path):
         os.mkdir(output_path)
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-    with open(config_path, "r") as config_f: # Load file with hyperparameter configuration.
-        params = json.load(config_f)
+    if model_type == GURK:
+        with open(config_path, "r") as config_f: # Load file with hyperparameter configuration.
+            params = json.load(config_f)
+        tokenizer = BertTokenizerFast.from_pretrained(params["tokenizer-model"])
+    else:
+       tokenizer = BertTokenizerFast.from_pretrained(model_type)
 
     if data_tokenizer_name is None:
-        data_tokenizer_name = params["tokenizer-model"]
-    
-    tokenizer = BertTokenizerFast.from_pretrained(params["tokenizer-model"])
+        if model_type == GURK:
+            data_tokenizer_name = params["tokenizer-model"]
+        else: 
+           data_tokenizer_name = model_type
+
     tokenizer_data = BertTokenizerFast.from_pretrained(data_tokenizer_name)
 
-    model = FullModel(
-            vocab_size=tokenizer.vocab_size,
-            max_len=params["max_len"],
-            **params["model_params"]
-        )
-    
-    print("Loading model...")
-    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=True)
-    model.load_state_dict(checkpoint['model_state_dict'])
+    if model_type == GURK:
+        model = FullModel(
+                vocab_size=tokenizer.vocab_size,
+                max_len=params["max_len"],
+                **params["model_params"]
+            )
+        
+        print("Loading model...")
+        checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=True)
+        model.load_state_dict(checkpoint['model_state_dict'])
+    else:
+        if task == MLM:
+            model = AutoModelForMaskedLM.from_pretrained(model_type).to(device)
+        else: 
+            model = BertModel.from_pretrained(model_type).to(device)
 
     print("Loading UD data...")
     train_dl, val_dl, test_dl = get_ud_data(ud_ds, batch_size=batch_size, tokenizer=tokenizer_data, label_type=task)
@@ -191,15 +214,22 @@ if __name__ == "__main__":
         model.eval()
         for line in tqdm(test_dl.dataset, desc="Predicting masked tokens.."):
             text = line["text"]
-            input_ids =  tokenizer_data(text, add_special_tokens=False, return_tensors="pt", max_length=params["max_len"], truncation=True)["input_ids"]
-            mask = torch.eye(input_ids.size(1)).bool().to(device)
-            masked_ids = input_ids.repeat(mask.size(1), 1).to(device)
-            masked_ids[mask] = tokenizer.mask_token_id
-            mask_token_index = torch.where(masked_ids == tokenizer.mask_token_id)[1]
-            with torch.no_grad():
-                output = model(masked_ids, key_padding_mask=None, pred_mask=torch.flatten(mask))
-            pred = output["masked_preds"]
-            tok_id = torch.argmax(pred, 1)
+            if model_type == GURK:
+               max_len = params["max_len"]
+            else:
+               max_len = tokenizer.model_max_length
+            mask_token_id = tokenizer.mask_token_id
+            input_ids =  tokenizer_data(
+               text,
+               add_special_tokens=False,
+               return_tensors="pt",
+               max_length=max_len,
+               truncation=True)["input_ids"]
+            if model_type == GURK:
+               pred = predict_masked_gurk(input_ids, model, mask_token_id)
+            else:
+               pred = predict_masked_bert(input_ids, model, mask_token_id)
+            
             acc1 = accuracy_at_n(y_true=input_ids, y_pred=pred, n=1)
             acc3 = accuracy_at_n(y_true=input_ids, y_pred=pred, n=3)
             acc5 = accuracy_at_n(y_true=input_ids, y_pred=pred, n=5)
@@ -224,8 +254,12 @@ if __name__ == "__main__":
         num_classes = len(mapping)
 
         print("Number of possible classes:", num_classes)
-        clf_nn = MLPClassifier(num_classes, model, dim=params["model_params"]["model_dim"])
-
+        if model_type == GURK:
+            clf_nn = MLPClassifier(num_classes, model, dim=params["model_params"]["model_dim"])
+        else:
+           dim = model.config.hidden_size
+           clf_nn = UpperBoundClassifier(num_classes, model, dim=dim)
+           
         # Train model.
         logs = train_model(
             clf_nn,
@@ -247,7 +281,8 @@ if __name__ == "__main__":
         dl=test_dl, 
         model=clf_nn, 
         task=task,
-        output=output_path
+        output=output_path, 
+        pad_token_id=tokenizer.pad_token_id
         )
         
         
