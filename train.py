@@ -47,21 +47,19 @@ if __name__ == "__main__":
 
     # Set up trainer:
     trainer = Trainer(
-    tokenizer=tokenizer,
-    # train_dir=params_dict["train_path"],
-    # test_dir=params_dict["val_path"],
-    train_dl=params_dict["train_path"],
-    test_dl=params_dict["val_path"],
-    model_params=params_dict["model_params"],
-    optim_params=params_dict["optim_params"], 
-    optimizer=optimizer,
-    n_epochs=params_dict["n_epochs"],
-    batch_size=params_dict["batch_size"],
-    mask_p=params_dict["masking_p"],
-    max_len=params_dict["max_len"],
-    scheduler=scheduler,
-    scheduler_params=params_dict.get("scheduler_params", {})
-)
+        tokenizer=tokenizer,
+        train_path=params_dict["train_path"],
+        val_path=params_dict["val_path"],
+        model_params=params_dict["model_params"],
+        optim_params=params_dict["optim_params"], 
+        optimizer=optimizer,
+        n_epochs=params_dict["n_epochs"],
+        batch_size=params_dict["batch_size"],
+        mask_p=params_dict["masking_p"],
+        max_len=params_dict["max_len"],
+        scheduler=scheduler,
+        scheduler_params=params_dict.get("scheduler_params", {})
+    )
     
     # Start training.
     os.makedirs(
@@ -75,8 +73,4 @@ if __name__ == "__main__":
     save_steps=params_dict["save_steps"],
     chp_path=params_dict["load_ckp"]
 )
-    
-
-
-
 
