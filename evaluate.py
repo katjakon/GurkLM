@@ -74,6 +74,7 @@ def save_metrics(label_mapping, dl, model, task, output, pad_token_id):
     golds_str = [label_mapping.get(g, "None") for g in gold_filtered]
     preds_str = [label_mapping.get(p, "None") for p in pred_filtered]
 
+    plt.rcParams["figure.figsize"] = (60, 9)  # Adjust figure size.
     ConfusionMatrixDisplay.from_predictions(golds_str, preds_str,
                                     labels=str_label, xticks_rotation="vertical")
 
@@ -185,7 +186,7 @@ if __name__ == "__main__":
             data_tokenizer_name = params["tokenizer-model"]
         else: 
            data_tokenizer_name = model_type
-
+   
     tokenizer_data = BertTokenizerFast.from_pretrained(data_tokenizer_name)
 
     if model_type == GURK:
@@ -204,9 +205,9 @@ if __name__ == "__main__":
         else: 
             model = BertModel.from_pretrained(model_type).to(device)
 
+
     print("Loading UD data...")
     train_dl, val_dl, test_dl = get_ud_data(ud_ds, batch_size=batch_size, tokenizer=tokenizer_data, label_type=task)
-
     if task == MLM:
         accs3 = []
         accs5 = []

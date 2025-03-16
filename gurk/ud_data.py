@@ -88,7 +88,6 @@ def get_ud_data(ud_name, batch_size, tokenizer, label_type):
         val_dataloader = DataLoader(val_tokenized, batch_size=batch_size)
         test_dataloader = DataLoader(test_tokenized, batch_size=batch_size)
     else:
-        print(f"Warning: label type {label_type}, no tokenization applied")
         # Create DataLoaders
         train_dataloader = DataLoader(train, batch_size=batch_size)
         val_dataloader = DataLoader(val, batch_size=batch_size)
