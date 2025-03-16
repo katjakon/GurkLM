@@ -30,9 +30,13 @@ def get_predictions(model, dl, pad_token_id):
   with torch.no_grad():
     for batch in tqdm(dl, desc="Predicting.."):
       inputs = batch["input_ids"].to(device)
+      attention_mask = batch["input_ids"].to(device)
       pad_mask  = inputs == pad_token_id
       # Get prediction
-      pred = model(inputs, pad_mask)
+      if isinstance(model, UpperBoundClassifier):
+         pred = model(inputs, attention_mask)
+      else:
+         pred = model(inputs, pad_mask)
       pred = pred.flatten(end_dim=1)
       # Get gold labels
       gold_labels = batch["labels"].to(device)
