@@ -30,7 +30,7 @@ def get_predictions(model, dl, pad_token_id):
   with torch.no_grad():
     for batch in tqdm(dl, desc="Predicting.."):
       inputs = batch["input_ids"].to(device)
-      attention_mask = batch["input_ids"].to(device)
+      attention_mask = batch["attention_mask"].to(device)
       pad_mask  = inputs == pad_token_id
       # Get prediction
       if isinstance(model, UpperBoundClassifier):
