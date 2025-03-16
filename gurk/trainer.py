@@ -7,8 +7,7 @@ from torch.utils.data import DataLoader
 import random
 import time
 
-from .dataset import GurkDataset
-from .data_management import GurkFolderDataset
+from .dataset import GurkFolderDataset
 from .modules import FullModel
 
 # silence tqdm
@@ -16,10 +15,29 @@ from tqdm import tqdm
 from functools import partialmethod
 tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
+
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class Trainer:
+    """Trainer class for pretraining the language model.
+
+    Args:
+        tokenizer: instantiated tokenizer to use
+        train_path: path to the directory with the prepared training data
+        val_path: path to the directory with the prepared validation data
+        model_params: model parameter dictionary from the config file
+        optimizer: optimizer class to use, as defined in the config file
+        optim_params: optimizer parameter dictionary from the config file
+        n_epochs: number of epochs to train for
+        batch_size: batch_size to use
+        mask_p: masking percentage
+        max_len: maximum sequence length the prepared data is using
+        p_only_masked: default is 0.8
+        scheduler: scheduler name, can be None
+        scheduler_params: scheduler parameters from the config file, or empty
+            dictionary
+    """
 
     def __init__(self,
                  tokenizer,
@@ -33,8 +51,8 @@ class Trainer:
                  mask_p, 
                  max_len,
                  p_only_masked=0.8,
-                scheduler = None,
-                scheduler_params = None):
+                 scheduler = None,
+                 scheduler_params = None):
         self.train_dataset = train_path
         self.val_dataset = val_path
         self.tokenizer = tokenizer

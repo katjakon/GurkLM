@@ -9,6 +9,7 @@ from gurk.trainer import Trainer
 
 torch.autograd.anomaly_mode.set_detect_anomaly(True)
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Train a GurkModel")
     parser.add_argument("--config", help="A json file which specifies all hyperparameters for a run.")
