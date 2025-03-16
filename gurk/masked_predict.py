@@ -17,6 +17,7 @@ def accuracy_at_n(y_true, y_pred, n=3):
     return torch.sum(correct) / correct.size(0)
 
 def predict_masked_gurk(input_ids, model, mask_token_id):
+    input_ids = input_ids.to(device)
     masked_ids, _, mask = mask_each_token(input_ids, mask_token_id)
     with torch.no_grad():
         output = model(masked_ids, key_padding_mask=None, pred_mask=torch.flatten(mask))
@@ -24,7 +25,9 @@ def predict_masked_gurk(input_ids, model, mask_token_id):
     return pred
 
 def predict_masked_bert(input_ids, model, mask_token_id):
+    input_ids = input_ids.to(device)
     masked_ids, mask_token_index, _ = mask_each_token(input_ids, mask_token_id)
     output = model(masked_ids).logits
     mask_token_logits = output[0, mask_token_index, :]
     return mask_token_logits
+
