@@ -203,6 +203,8 @@ if __name__ == "__main__":
             model = AutoModelForMaskedLM.from_pretrained(model_type).to(device)
         else: 
             model = BertModel.from_pretrained(model_type).to(device)
+    print(f"Using device {device}")
+    model.to(device)
 
     print("Loading UD data...")
     train_dl, val_dl, test_dl = get_ud_data(ud_ds, batch_size=batch_size, tokenizer=tokenizer_data, label_type=task)
