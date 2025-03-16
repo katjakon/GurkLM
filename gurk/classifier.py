@@ -1,6 +1,5 @@
 import torch
 from tqdm import tqdm
-from sklearn.metrics import accuracy_score
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -38,7 +37,7 @@ class MLPClassifier(torch.nn.Module):
         # Retrieve embedding representation first
         self.model.eval()
         with torch.no_grad():
-          emb = self.model(token_ids=x,key_padding_mask=padding_mask, pred_mask=None)["representations"]
+          emb = self.model(token_ids=x, key_padding_mask=padding_mask, pred_mask=None)["representations"]
         # Feed through mlp.
         return self.mlp(emb)
 
@@ -74,9 +73,16 @@ def get_pred_metrics(model, batch, device, loss_fn, pad_token_id=0):
     of items in this batch
     """
     inputs = batch["input_ids"].to(device)
+    attention_mask = batch["attention_mask"].to(device)
     pad_mask  = inputs == pad_token_id
     # Get prediction
-    pred = model(inputs, pad_mask)
+    if isinstance(model, UpperBoundClassifier):
+      pred = model(inputs, attention_mask)
+    elif isinstance(model, MLPClassifier):
+       pred = model(inputs, pad_mask)
+    else:
+       raise ValueError(f"Unkown classifier type {type(model)}")
+    
     pred = pred.flatten(end_dim=1)
     # Get gold labels
     gold_labels = batch["labels"].to(device)
