@@ -85,14 +85,16 @@ class Trainer:
     def _get_train_dataloader(self):
         """Create the data loader for the training data."""
         print("Loading training data...")
-        train_loader = self._get_dataloader(self.train_dataset)
+        # train_loader = self._get_dataloader(self.train_dataset)
+        train_loader = GurkFolderDataset(self.train_dataset).get_dataloader(batch_size=self.batch_size)
         print("-> Done!")
         return train_loader
 
     def _get_val_dataloader(self):
         """Create the data loader for the validation data."""
         print("Loading validation data...")
-        val_loader = self._get_dataloader(self.val_dataset)
+        # val_loader = self._get_dataloader(self.val_dataset)
+        val_loader = GurkFolderDataset(self.val_dataset).get_dataloader(batch_size=self.batch_size)
         print("-> Done!")
         return val_loader
 
@@ -234,7 +236,6 @@ class Trainer:
 
         # Training loop
         loss = None
-        print("The range:", range(self.start_epoch, self.n_epochs))
         for epoch in range(self.start_epoch, self.n_epochs):
 
             torch.cuda.empty_cache()
