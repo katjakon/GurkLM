@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from gurk.modules import FullModel
 from gurk.ud_data import get_ud_data, get_code_mapping, get_pos_mapping, POS, CODE
-from gurk.classifier import MLPClassifier, UpperBoundClassifier, train_model
+from gurk.classifier import MLPClassifier, UpperBoundClassifier, RandomBaseline, train_model
 from gurk.masked_predict import accuracy_at_n, predict_masked_bert, predict_masked_gurk
 
 MLM = "mlm"
@@ -35,6 +35,8 @@ def get_predictions(model, dl, pad_token_id):
       # Get prediction
       if isinstance(model, UpperBoundClassifier):
          pred = model(inputs, attention_mask)
+      elif isinstance(model, RandomBaseline):
+         pred = model(inputs)
       else:
          pred = model(inputs, pad_mask)
       pred = pred.flatten(end_dim=1)

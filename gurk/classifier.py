@@ -66,6 +66,29 @@ def accuracy(gold, pred, ignore_index=-100):
     # (correct, total)
     return sum(filtered_preds), len(filtered_preds)
 
+class RandomBaseline(MLPClassifier):
+   
+  def __init__(self, num_classes, vocab_size, dim):
+    super(MLPClassifier, self).__init__()
+    self.model = torch.nn.Embedding(
+        num_embeddings=vocab_size,
+        embedding_dim=dim
+        )
+    self.disable_grad(self.model)
+    self.mlp = torch.nn.Sequential(
+        torch.nn.Linear(dim, dim),
+        torch.nn.ReLU(),
+        torch.nn.Linear(dim, num_classes),
+    )
+
+  def forward(self, x):
+    self.model.eval()
+    with torch.no_grad():
+        emb = self.model(x)
+      # Feed through single linear layer
+    return self.mlp(emb)
+  
+
 def get_pred_metrics(model, batch, device, loss_fn, pad_token_id=0):
     """Get all necessary metrics for one forward pass of a batch.
 
@@ -78,6 +101,8 @@ def get_pred_metrics(model, batch, device, loss_fn, pad_token_id=0):
     # Get prediction
     if isinstance(model, UpperBoundClassifier):
       pred = model(inputs, attention_mask)
+    elif isinstance(model, RandomBaseline):
+       pred = model(inputs)
     elif isinstance(model, MLPClassifier):
        pred = model(inputs, pad_mask)
     else:
