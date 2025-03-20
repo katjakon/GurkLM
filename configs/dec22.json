@@ -1,0 +1,23 @@
+{
+    "train_path": "data/dataloader_train.pth",
+    "val_path": "data/dataloader_val.pth",
+    "checkpoint_path": "dec22/",
+    "start_from_ckp": true,
+    "load_ckp": "dec19/checkpoint-epoch1-step112805.pt",
+    "save_steps": 50000,
+    "tokenizer-model": "google-bert/bert-base-multilingual-cased",
+    "optimizer": "sgd",
+    "n_epochs": 5,
+    "batch_size": 16,
+    "masking_p": 0.15,
+    "max_len": 512,
+    "model_params": {
+        "model_dim": 512,
+        "num_heads": 4, 
+        "n_layers": 6,
+        "dropout": 0.2
+    },
+    "optim_params": {
+        "lr": 0.001
+    }
+}

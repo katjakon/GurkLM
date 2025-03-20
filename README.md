@@ -18,3 +18,10 @@ The following tasks are used to evaluate the performance of the pretraining proc
 - **Masked Language Modelling**: Correct prediction of masked tokens in the test set / Perplexity?
 
 
+# more is more (data)
+
+- https://github.com/ozlemcek/TuGeBiC
+  + \# of tokens 	116688
+  + \# of monolingual sentences 	10141
+  + \# of bilingual sentences 	4510
+  + \# of CS points in bilingual sentences 	8180
